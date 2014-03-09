@@ -1,11 +1,15 @@
 --[[
-	MultiKill Mod 1.0.1
+	MultiKill Mod 1.0.2
 	Author: NeoZeroo
 	E-mail: neozeroo+cobalt@gmail.com
 	Thread: http://www.cobaltforum.net/topic/1884-
 
 
 	* Changelog *
+	1.0.2
+	-Compatible with 107-ALPHA
+	-Removed a fix to a text rendering bug already in the game (they fixed it in 107-ALPHA)
+
 	1.0.1
 	-Fixed error with vibration when the first player is using a joystick
 --]]
@@ -208,11 +212,7 @@ function Actor:applyAttackDamage(...)
 	if(args[2].target and args[2].target.player and args[2].target.player.__id) then
 		setShake(args[2].target.player.__id, 0.12)
 	end
-	--aqui
-	--clearp()
-	--listar(args[1])
-
-	--return oldApplyAttackDamage(self, ...)
+	return oldApplyAttackDamage(self, ...)
 end
 
 
@@ -295,23 +295,6 @@ function ScoreHud:renderEndScore(...)
 	end
 	return oldrenderEndScore(self, ...)
 end
-
-
--- Hack to fix a game problem when rendering "Team Wins!" at
--- wrong position if using other resolutions than 1280x800
-oldRenderTextSprites = video.renderTextSprites
-function video:renderTextSprites(...)
-	local args = {...}
-
-	if(wins[self]) then
-		args[1] = args[1] * screenFactor
-		args[2] = args[2] * screenFactor
-	end
-
-	return oldRenderTextSprites(self, unpack(args))
-end
-
---*************************************************************************
 
 
 -- Update frag list
@@ -502,6 +485,9 @@ end
 
 -- Add kill and its properties to multikills list
 function enqueuePreMulti(id, idDead, annType, annId)
+	if(idDead == nil) then
+		return
+	end
 	local x = playerList[idDead].actor.lastX
 	local y = playerList[idDead].actor.lastY
 	local annAudio = announcer[annType][annId].audio
@@ -945,18 +931,9 @@ function restart_hooks()
 end
 
 
-function listar(...)
-	return printList(...)
-end
-
 -- Press tab to laugh
 function onKeyPress(key)
-	if(key == 32) then
-		teste()
-	elseif(key == 46) then
-		restart_multikill()
-	--manter
-	elseif(key == 9) then
+	if(key == 9) then
 		setEmotion(getKeyboardId(), 'laugh')
 	end
 end
@@ -965,35 +942,11 @@ hook.add("keyPress", onKeyPress)
 loadSettings()
 readScore()
 
-function teste()
-	--aqui
-	clearp()
-	listar(Actor, 500)
-	--listar(true)
-	--getOriginalActor
-	--getResponsibleActor
-	--getParent
-end
-
-oldname = 'hit'
-oldfunction = Actor[oldname]
-function Actor:hit(...)
-
-	local args = {...}
-	--print(daisy.getSeconds())
-	listar(args[1])
-
-
-	return oldfunction(self, ...)
-end
-
 end -- end of file
 hook.add("gameInit", onInit_Multikill)
 
 
 function restart_multikill()
-	Actor[oldname] = oldfunction
-
   	restart_hooks()
 	Mode.onPlayerActorAdded = OldPlayerActorAdded
 	Mode.onRenderGameModeViewHud = OldRenderGameModeViewHud
