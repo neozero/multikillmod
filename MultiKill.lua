@@ -1,11 +1,18 @@
 --[[
-	MultiKill Mod 1.0.3
+	MultiKill Mod 1.1
 	Author: NeoZeroo
 	E-mail: neozeroo+cobalt@gmail.com
 	Thread: http://www.cobaltforum.net/topic/1884-
 
+	* TO-DO *
+	- Redo the global stats feature. "Player win" screen interface changed.
 
 	* Changelog *
+	1.1
+	- Compatible with v124h-Alpha
+	- Fixed: laugh button didn't work
+	- Fixed: crashed when playing Free For All mode (no teams)
+
 	1.0.3
 	- Compatible with v115-Alpha
 	- Fixed: since v113, sometimes the laugh button caused a crash
@@ -22,7 +29,7 @@ local function onInit_Multikill()
 
 debugging = false
 mouseVisible = false
-print('MultiKill 1.0.3 Activated')
+print('MultiKill 1.1 Activated')
 
 realScreenWidth, realScreenHeight = video.getScreenSize()
 screenWidth, screenHeight = 1280, 800
@@ -55,12 +62,6 @@ spriteList = {
 	blastGun  = video.createSpriteState('blastgun', '../char.dat'),
 	signBreak = video.createSpriteState('signBreak', '../tiles.dat')
 }
-
-wins = {}
-wins['Red wins!']    = true
-wins['Green wins!']  = true
-wins['Blue wins!']   = true
-wins['Yellow wins!'] = true
 
 streak = {}
 preMultiQueue = {}
@@ -103,45 +104,58 @@ function Mode:onPlayerActorAdded(e)
 	return OldPlayerActorAdded(self,e)
 end
 
-
--- When a player joins a team
+-- When a bot joins the game
 -- Add to playerList and reset streaks
-oldPlayerWantsToJoinTeam = Mode.onPlayerWantsToJoinTeam
-function Mode:onPlayerWantsToJoinTeam(e)
+oldPlayerJoined = Mode.onPlayerJoined
+function Mode:onPlayerJoined(e)
 	local id, player
 	if(e.ai) then
 		player = e.ai.player
 
-		local new = true
+		local newAI = true
 		for i,k in pairs(playerList) do
 			if(k.name == player.name) then
 				id = i
-				new = false
+				newAI = false
 			end
 		end
 
-		if(new) then
+		if(newAI) then
 			aiCount = aiCount and aiCount+1 or 101
 			id = aiCount
 		end
-	else
-		player = e.sender.player
-		id = e.sender.id
+
+		debugPrint('---onPlayerJoined('..id..')')
+
+		currentGame = e.game
+		player.__id = id
+		playerList[id] = player
+		pstats[id] = { kill = 0, death = 0, tk = 0 }
+		resetStreak(id, 0, 0)
+		clearp()
 	end
+	return oldPlayerJoined(self, e)
+end
+
+-- When a player joins the game
+-- Add to playerList and reset streaks
+oldInputSenderAdded = Player.onInputSenderAdded
+function Player:onInputSenderAdded(e)
+	local player = e.player
+	local id = e.player.id
 
 	debugPrint('---onPlayerWantsToJoinTeam('..id..')')
 
-	currentGame = e.game
+	currentGame = player.game
 	player.__id = id
 	playerList[id] = player
 	pstats[id] = { kill = 0, death = 0, tk = 0 }
 	resetStreak(id, 0, 0)
 	clearp()
-	return oldPlayerWantsToJoinTeam(self, e)
+	return oldInputSenderAdded(self, e)
 end
 
-
--- When a player lefts a team
+-- When a player lefts the game
 -- Exclude fom playerList
 oldPlayerLeft = Mode.onPlayerLeft
 function Mode:onPlayerLeft(e)
@@ -222,9 +236,8 @@ end
 
 
 -- When player with joystick presses Select, make actor laugh
-oldJoyButtonPressed = Input.joyButtonPressed
-function Input:joyButtonPressed(jid, button, ...)
-
+oldJoyButtonPressed = InputState.joyButtonPressed
+function InputState:joyButtonPressed(jid, button, ...)
 	-- if button 8, laugh
 	if(jid and self.joysticks[jid]
 		and self.joysticks[jid].player
@@ -706,17 +719,26 @@ function setEmotion(id, ...)
 		return false
 	end
 
+	local emotion = {}
+	emotion.active = true
+	emotion.amount = 1
+	emotion.delay = 0
+	emotion.duration = 1.5
+	emotion.seed = 0
+	emotion.speed = 6
+	emotion.time = 0
+
 	for i,k in pairs(args) do
-		playerList[id].actor.emotionsActive[k] = true
+		playerList[id].actor.emotionsActive[k] = emotion
 	end
 
-	if(playerList[id].actor.emotionAmount == nil) then
-		playerList[id].actor.emotionAmount = 1
-	end
-
-	playerList[id].actor.emotionDuration = 1.5
-	playerList[id].actor.emotionDelay = 0
+	playerList[id].actor.emotionLocked = false
 	playerList[id].actor.expressingEmotion = true
+
+
+
+
+
 
 	return true
 end
@@ -946,6 +968,10 @@ function restart_hooks()
 	hook.remove("gameInit", onInit_Multikill)
 end
 
+function listar(...)
+	return printList(...)
+end
+
 -- Press tab to laugh
 function onKeyPress(key)
 	if(key == 9) then
@@ -953,6 +979,9 @@ function onKeyPress(key)
 	end
 end
 hook.add("keyPress", onKeyPress)
+
+--***********************************************
+
 
 loadSettings()
 readScore()
@@ -970,10 +999,12 @@ function restart_multikill()
 	Mode.onPlayerLeft = oldPlayerLeft
 	Mode.onPlayerStatChanged = oldPlayerStatChanged
 	Mode.onRenderGameModeHud = oldRenderGameModeHud
+	Mode.onPlayerJoined = oldPlayerJoined
 	Actor.applyAttackDamage = oldApplyAttackDamage
 	Actor.forcedKill = oldForcedKill
-	Input.joyButtonPressed = oldJoyButtonPressed
+	InputState.joyButtonPressed = oldJoyButtonPressed
 	ScoreHud.renderEndScore = oldrenderEndScore
+	Player.onInputSenderAdded = oldInputSenderAdded
 
 	-- store before restart
 	local tempPlayerList = playerList
