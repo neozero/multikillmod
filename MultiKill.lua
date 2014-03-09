@@ -1,24 +1,28 @@
 --[[
-	MultiKill Mod 1.0.2
+	MultiKill Mod 1.0.3
 	Author: NeoZeroo
 	E-mail: neozeroo+cobalt@gmail.com
 	Thread: http://www.cobaltforum.net/topic/1884-
 
 
 	* Changelog *
+	1.0.3
+	- Compatible with v115-Alpha
+	- Fixed: since v113, sometimes the laugh button caused a crash
+
 	1.0.2
-	-Compatible with 107-ALPHA
-	-Removed a fix to a text rendering bug already in the game (they fixed it in 107-ALPHA)
+	- Compatible with v107-Alpha
+	- Removed a fix to a text rendering bug already in the game (they fixed it in 107-ALPHA)
 
 	1.0.1
-	-Fixed error with vibration when the first player is using a joystick
+	- Fixed error with vibration when the first player is using a joystick
 --]]
 
 local function onInit_Multikill()
 
 debugging = false
 mouseVisible = false
-print('MultiKill 1.0 Activated')
+print('MultiKill 1.0.3 Activated')
 
 realScreenWidth, realScreenHeight = video.getScreenSize()
 screenWidth, screenHeight = 1280, 800
@@ -67,7 +71,8 @@ fragQueue = {}
 fragList = {}
 multiQueue = {}
 shakeQueue = {}
-randoms = {}
+randoms = { 0, 0 }
+needRandom = true
 scoresFile = 'MultiKill_scores.txt'
 
 
@@ -485,7 +490,7 @@ end
 
 -- Add kill and its properties to multikills list
 function enqueuePreMulti(id, idDead, annType, annId)
-	if(idDead == nil) then
+	if(idDead == nil or playerList[idDead] == nil or playerList[idDead].actor == nil) then
 		return
 	end
 	local x = playerList[idDead].actor.lastX
@@ -550,6 +555,7 @@ function renderMultiKills()
 		else
 			x = x + randoms[1]
 			y = y + randoms[2]
+			needRandom = true
 		end
 		local alpha = (255 - variationOut * 255) * math.min(1, life*30)
 
@@ -691,7 +697,6 @@ function getKeyboardId()
 	end
 end
 
-
 -- Set actor emotion (duration automatically managed by the game)
 function setEmotion(id, ...)
 	--happy, sad, angry, surprised, confused, laugh, impressed, diggit, tappin, steppin, groovin
@@ -700,9 +705,17 @@ function setEmotion(id, ...)
 	if (Settings.LaughButton == false or id == nil or playerList[id] == nil or playerList[id].actor == nil or playerList[id].actor.emotions == nil) then
 		return false
 	end
+
 	for i,k in pairs(args) do
 		playerList[id].actor.emotionsActive[k] = true
 	end
+
+	if(playerList[id].actor.emotionAmount == nil) then
+		playerList[id].actor.emotionAmount = 1
+	end
+
+	playerList[id].actor.emotionDuration = 1.5
+	playerList[id].actor.emotionDelay = 0
 	playerList[id].actor.expressingEmotion = true
 
 	return true
@@ -711,8 +724,11 @@ end
 
 -- Generate random numbers needed inside rendering functions
 function generateRandom()
-	randoms[1] = math.random(-10,10)
-	randoms[2] = math.random(-10,10)
+	if (needRandom) then
+		randoms[1] = math.random(-10,10)
+		randoms[2] = math.random(-10,10)
+		needRandom = false
+	end
 end
 
 
@@ -930,7 +946,6 @@ function restart_hooks()
 	hook.remove("gameInit", onInit_Multikill)
 end
 
-
 -- Press tab to laugh
 function onKeyPress(key)
 	if(key == 9) then
@@ -957,7 +972,6 @@ function restart_multikill()
 	Mode.onRenderGameModeHud = oldRenderGameModeHud
 	Actor.applyAttackDamage = oldApplyAttackDamage
 	Actor.forcedKill = oldForcedKill
-	video.renderTextSprites = oldRenderTextSprites
 	Input.joyButtonPressed = oldJoyButtonPressed
 	ScoreHud.renderEndScore = oldrenderEndScore
 
